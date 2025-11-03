@@ -25,17 +25,28 @@ serve(async (req) => {
     
     let knowledge: any[] = [];
     
-    // First check if message contains SCN code pattern (e.g., IB-06, ERROR-01)
-    const scnPattern = /\b([A-Z]{2,5}-?\d+(?:\.\d+)?)\b/gi;
+    // Enhanced SCN code pattern matching (handles IB-02, IB02, IB02_WIT, ERROR-01, etc.)
+    const scnPattern = /\b([A-Z]{2,5}[-_]?\d+(?:\.\d+)?(?:[-_][A-Z]+)?)\b/gi;
     const scnMatches = message.match(scnPattern);
     
     if (scnMatches) {
       for (const scn of scnMatches) {
-        const normalizedScn = scn.replace('-', '').toUpperCase();
+        // Extract core code (e.g., "IB02" from "IB02_WIT" or "IB-02")
+        const coreCode = scn.split(/[-_]/)[0] + (scn.match(/\d+/) || [''])[0];
+        
+        // Search variations: original, with hyphen, without hyphen, core code
+        const searchVariations = [
+          `scn_code.ilike.%${scn}%`,
+          `scn_code.ilike.%${coreCode}%`,
+          `scn_code.ilike.%${coreCode.replace(/([A-Z]+)(\d+)/, '$1-$2')}%`,
+          `question.ilike.%${scn}%`,
+          `question.ilike.%${coreCode}%`
+        ];
+        
         const { data: scnResults } = await supabase
           .from("scm_knowledge")
           .select("*")
-          .or(`scn_code.ilike.%${scn}%,scn_code.ilike.%${normalizedScn}%`);
+          .or(searchVariations.join(','));
         
         if (scnResults && scnResults.length > 0) {
           knowledge = [...knowledge, ...scnResults];
