@@ -25,8 +25,8 @@ serve(async (req) => {
     
     let knowledge: any[] = [];
     
-    // First check if message contains SCN code pattern (e.g., IB-06, IB06)
-    const scnPattern = /\b(IB-?\d+(?:\.\d+)?)\b/gi;
+    // First check if message contains SCN code pattern (e.g., IB-06, ERROR-01)
+    const scnPattern = /\b([A-Z]{2,5}-?\d+(?:\.\d+)?)\b/gi;
     const scnMatches = message.match(scnPattern);
     
     if (scnMatches) {
@@ -40,6 +40,23 @@ serve(async (req) => {
         if (scnResults && scnResults.length > 0) {
           knowledge = [...knowledge, ...scnResults];
         }
+      }
+    }
+    
+    // Check for error/issue keywords for error solving
+    const errorKeywords = ['error', 'issue', 'problem', 'fail', 'not working', 'broken', 'fix', 'solve', 'resolution', 'warning'];
+    const hasErrorKeyword = errorKeywords.some(keyword => message.toLowerCase().includes(keyword));
+    
+    if (hasErrorKeyword && knowledge.length === 0) {
+      // Search for error resolutions
+      const { data: errorData } = await supabase
+        .from('scm_knowledge')
+        .select('*')
+        .contains('keywords', ['error'])
+        .limit(10);
+      
+      if (errorData && errorData.length > 0) {
+        knowledge = [...knowledge, ...errorData];
       }
     }
     
@@ -123,10 +140,16 @@ Important guidelines:
 - For acronyms like PO (Purchase Order), SAP, MAWM (Manhattan Active Warehouse Management), explain them briefly the first time
 
 Error Solving Capabilities:
-- When users report errors, ask specific questions to understand the context (which transaction, which step, what error message)
+- When users report errors or issues, first check if there's a matching error scenario in the knowledge base (SCN codes starting with ERROR-)
+- If you find a matching error with a resolution, provide the solution step-by-step clearly and concisely
+- If no exact match is found in the knowledge base, use your expertise to analyze the error and provide the best possible solution
+- Ask specific questions to understand the context when needed (which transaction, which step, what error message)
 - Provide step-by-step troubleshooting guidance
 - Common error categories to address:
-  * Expiry date errors: Check date format, ensure future dates, verify system settings
+  * RTC/WIT issues: Check Auto Transport settings, Smartsim configurations
+  * New item errors: Check New Item Flag status in item facilities
+  * Expiry date errors: Verify Min Max dates in SAP, check if item is properly configured as expiry dated
+  * Catch weight errors: Update tolerance values for ASN
   * Receiving errors: Verify ASN status, check PO details, confirm item profiling
   * Putaway errors: Check location availability, verify task group assignments, confirm zone configurations
   * Data mismatch errors: Compare SAP vs MAWM data, check synchronization status
