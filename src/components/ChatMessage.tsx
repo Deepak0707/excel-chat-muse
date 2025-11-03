@@ -9,7 +9,7 @@ interface ChatMessageProps {
 export const ChatMessage = ({ role, content }: ChatMessageProps) => {
   const isUser = role === "user";
 
-  // Convert markdown-style links to HTML links
+  // Convert markdown-style links to HTML links and handle document downloads
   const formatContent = (text: string) => {
     // Match markdown links [text](url) and convert to HTML
     const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
@@ -22,16 +22,30 @@ export const ChatMessage = ({ role, content }: ChatMessageProps) => {
       if (match.index > lastIndex) {
         parts.push(text.substring(lastIndex, match.index));
       }
-      // Add the link
+      
+      const linkText = match[1];
+      const linkUrl = match[2];
+      const isDocument = linkUrl.includes('/documents/') || linkText.toLowerCase().includes('document');
+      
+      // Add the link with appropriate styling
       parts.push(
         <a
           key={match.index}
-          href={match[2]}
+          href={linkUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-primary hover:underline font-medium"
+          download={isDocument}
+          className={cn(
+            "font-medium hover:underline inline-flex items-center gap-1",
+            isDocument ? "text-accent-foreground bg-accent px-2 py-1 rounded" : "text-primary"
+          )}
         >
-          {match[1]}
+          {linkText}
+          {isDocument && (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          )}
         </a>
       );
       lastIndex = match.index + match[0].length;

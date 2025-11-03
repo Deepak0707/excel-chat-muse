@@ -20,21 +20,40 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Search for relevant knowledge using keywords and full-text search
-    // First try exact keyword matches
+    // Search for relevant knowledge using keywords, SCN codes, and full-text search
     const searchTerms = message.toLowerCase().split(' ').filter((term: string) => term.length > 2);
     
     let knowledge: any[] = [];
     
-    // Try keyword search first
-    for (const term of searchTerms) {
-      const { data: keywordMatches } = await supabase
-        .from("scm_knowledge")
-        .select("*")
-        .contains('keywords', [term]);
-      
-      if (keywordMatches && keywordMatches.length > 0) {
-        knowledge = [...knowledge, ...keywordMatches];
+    // First check if message contains SCN code pattern (e.g., IB-06, IB06)
+    const scnPattern = /\b(IB-?\d+(?:\.\d+)?)\b/gi;
+    const scnMatches = message.match(scnPattern);
+    
+    if (scnMatches) {
+      for (const scn of scnMatches) {
+        const normalizedScn = scn.replace('-', '').toUpperCase();
+        const { data: scnResults } = await supabase
+          .from("scm_knowledge")
+          .select("*")
+          .or(`scn_code.ilike.%${scn}%,scn_code.ilike.%${normalizedScn}%`);
+        
+        if (scnResults && scnResults.length > 0) {
+          knowledge = [...knowledge, ...scnResults];
+        }
+      }
+    }
+    
+    // Try keyword search
+    if (knowledge.length === 0) {
+      for (const term of searchTerms) {
+        const { data: keywordMatches } = await supabase
+          .from("scm_knowledge")
+          .select("*")
+          .contains('keywords', [term]);
+        
+        if (keywordMatches && keywordMatches.length > 0) {
+          knowledge = [...knowledge, ...keywordMatches];
+        }
       }
     }
     
@@ -43,7 +62,7 @@ serve(async (req) => {
       const { data: textMatches, error: dbError } = await supabase
         .from("scm_knowledge")
         .select("*")
-        .or(`question.ilike.%${message}%,answer.ilike.%${message}%`);
+        .or(`question.ilike.%${message}%,answer.ilike.%${message}%,scn_code.ilike.%${message}%`);
 
       if (dbError) {
         console.error("Database error:", dbError);
@@ -60,12 +79,23 @@ serve(async (req) => {
 
     // Prepare context for AI from knowledge base
     let context = "";
+    let hasExecutionDoc = false;
+    let executionDocUrl = "";
+    
     if (knowledge && knowledge.length > 0) {
       context = knowledge
         .map((item) => {
           let entry = `Q: ${item.question}\nA: ${item.answer}`;
+          if (item.scn_code) {
+            entry = `SCN: ${item.scn_code}\n` + entry;
+          }
           if (item.link) {
             entry += `\nLink: ${item.link}`;
+          }
+          if (item.document_url) {
+            hasExecutionDoc = true;
+            executionDocUrl = item.document_url;
+            entry += `\nExecution Document: ${item.document_url}`;
           }
           return entry;
         })
@@ -78,18 +108,31 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const systemPrompt = `You are SCM AI, a helpful supply chain management assistant. You help users with questions about SAP, purchase orders, inventory management, logistics, warehouse operations, and more.
+    const systemPrompt = `You are SCM AI, a helpful supply chain management assistant. You help users with questions about SAP, purchase orders, inventory management, logistics, warehouse operations, MAWM (Manhattan Active Warehouse Management), and more.
 
-${context ? `Use the following knowledge base to answer questions. If the information contains a link, include it naturally in your response:\n\n${context}\n\n` : ""}
+${context ? `Use the following knowledge base to answer questions:\n\n${context}\n\n` : ""}
 
 Important guidelines:
 - Answer naturally and conversationally, as if you have this knowledge yourself
 - NEVER mention that you're using a knowledge base, Excel file, or database
-- If there's a relevant link in the knowledge base, include it naturally (e.g., "You can access it here: [link]")
-- If you don't have specific information, provide a helpful general response
+- If there's a relevant link in the knowledge base, include it naturally in your response as a clickable link
+- If there's an execution document available, mention it and provide the download link in this exact format: [Download Execution Document](DOCUMENT_URL)
 - Be concise but thorough
 - Use formatting like bullet points when listing steps
-- For acronyms like PO, SAP, MAWM, explain them briefly the first time`;
+- For acronyms like PO (Purchase Order), SAP, MAWM (Manhattan Active Warehouse Management), explain them briefly the first time
+
+Error Solving Capabilities:
+- When users report errors, ask specific questions to understand the context (which transaction, which step, what error message)
+- Provide step-by-step troubleshooting guidance
+- Common error categories to address:
+  * Expiry date errors: Check date format, ensure future dates, verify system settings
+  * Receiving errors: Verify ASN status, check PO details, confirm item profiling
+  * Putaway errors: Check location availability, verify task group assignments, confirm zone configurations
+  * Data mismatch errors: Compare SAP vs MAWM data, check synchronization status
+  * Permission errors: Verify user roles and access rights
+- Always provide actionable next steps
+- If the error is complex, suggest contacting the appropriate team with specific details to share`;
+
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
