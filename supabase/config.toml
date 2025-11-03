@@ -1,0 +1,4 @@
+project_id = "bvoomuokgelzmrlsktnp"
+
+[functions.scm-chat]
+verify_jwt = false
