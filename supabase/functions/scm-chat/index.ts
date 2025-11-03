@@ -20,7 +20,7 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Search for relevant knowledge using keywords, SCN codes, and full-text search
+    // Search for relevant knowledge using flexible matching
     const searchTerms = message.toLowerCase().split(' ').filter((term: string) => term.length > 2);
     
     let knowledge: any[] = [];
@@ -43,50 +43,52 @@ serve(async (req) => {
       }
     }
     
-    // Check for error/issue keywords for error solving
-    const errorKeywords = ['error', 'issue', 'problem', 'fail', 'not working', 'broken', 'fix', 'solve', 'resolution', 'warning'];
-    const hasErrorKeyword = errorKeywords.some(keyword => message.toLowerCase().includes(keyword));
+    // Build flexible search queries for better matching
+    const searchQueries: string[] = [];
     
-    if (hasErrorKeyword && knowledge.length === 0) {
-      // Search for error resolutions
+    // Search each term individually across all text fields
+    for (const term of searchTerms) {
+      searchQueries.push(`question.ilike.%${term}%`);
+      searchQueries.push(`answer.ilike.%${term}%`);
+      searchQueries.push(`scn_code.ilike.%${term}%`);
+    }
+    
+    // Also search for the full message
+    searchQueries.push(`question.ilike.%${message}%`);
+    searchQueries.push(`answer.ilike.%${message}%`);
+    
+    // Execute flexible search if no SCN matches
+    if (knowledge.length === 0 && searchQueries.length > 0) {
+      const { data: flexibleMatches } = await supabase
+        .from("scm_knowledge")
+        .select("*")
+        .or(searchQueries.join(','));
+      
+      if (flexibleMatches && flexibleMatches.length > 0) {
+        knowledge = [...knowledge, ...flexibleMatches];
+      }
+    }
+    
+    // Check for error/issue keywords and expand search
+    const errorKeywords = ['error', 'issue', 'problem', 'fail', 'not working', 'broken', 'fix', 'solve', 'resolution', 'warning', 'rtc', 'wit', 'item', 'receiving', 'putaway'];
+    const matchedErrorKeywords = errorKeywords.filter(keyword => message.toLowerCase().includes(keyword));
+    
+    // If we have error keywords but no matches yet, search by those keywords
+    if (matchedErrorKeywords.length > 0 && knowledge.length === 0) {
+      const errorSearchQueries = matchedErrorKeywords.flatMap(keyword => [
+        `question.ilike.%${keyword}%`,
+        `answer.ilike.%${keyword}%`
+      ]);
+      
       const { data: errorData } = await supabase
         .from('scm_knowledge')
         .select('*')
-        .contains('keywords', ['error'])
+        .or(errorSearchQueries.join(','))
         .limit(10);
       
       if (errorData && errorData.length > 0) {
         knowledge = [...knowledge, ...errorData];
       }
-    }
-    
-    // Try keyword search
-    if (knowledge.length === 0) {
-      for (const term of searchTerms) {
-        const { data: keywordMatches } = await supabase
-          .from("scm_knowledge")
-          .select("*")
-          .contains('keywords', [term]);
-        
-        if (keywordMatches && keywordMatches.length > 0) {
-          knowledge = [...knowledge, ...keywordMatches];
-        }
-      }
-    }
-    
-    // If no keyword matches, try full-text search
-    if (knowledge.length === 0) {
-      const { data: textMatches, error: dbError } = await supabase
-        .from("scm_knowledge")
-        .select("*")
-        .or(`question.ilike.%${message}%,answer.ilike.%${message}%,scn_code.ilike.%${message}%`);
-
-      if (dbError) {
-        console.error("Database error:", dbError);
-        throw dbError;
-      }
-      
-      knowledge = textMatches || [];
     }
     
     // Remove duplicates
