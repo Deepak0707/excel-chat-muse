@@ -18,28 +18,34 @@ export type Database = {
         Row: {
           answer: string
           created_at: string
+          document_url: string | null
           id: string
           keywords: string[] | null
           link: string | null
           question: string
+          scn_code: string | null
           updated_at: string
         }
         Insert: {
           answer: string
           created_at?: string
+          document_url?: string | null
           id?: string
           keywords?: string[] | null
           link?: string | null
           question: string
+          scn_code?: string | null
           updated_at?: string
         }
         Update: {
           answer?: string
           created_at?: string
+          document_url?: string | null
           id?: string
           keywords?: string[] | null
           link?: string | null
           question?: string
+          scn_code?: string | null
           updated_at?: string
         }
         Relationships: []
