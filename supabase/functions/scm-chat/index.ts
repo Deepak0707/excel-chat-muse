@@ -79,8 +79,7 @@ serve(async (req) => {
 
     // Prepare context for AI from knowledge base
     let context = "";
-    let hasExecutionDoc = false;
-    let executionDocUrl = "";
+    const documentsFound: Array<{scn: string, url: string}> = [];
     
     if (knowledge && knowledge.length > 0) {
       context = knowledge
@@ -93,9 +92,8 @@ serve(async (req) => {
             entry += `\nLink: ${item.link}`;
           }
           if (item.document_url) {
-            hasExecutionDoc = true;
-            executionDocUrl = item.document_url;
-            entry += `\nExecution Document: ${item.document_url}`;
+            documentsFound.push({ scn: item.scn_code, url: item.document_url });
+            entry += `\nExecution Document Available: ${item.document_url}`;
           }
           return entry;
         })
@@ -112,11 +110,13 @@ serve(async (req) => {
 
 ${context ? `Use the following knowledge base to answer questions:\n\n${context}\n\n` : ""}
 
+${documentsFound.length > 0 ? `IMPORTANT - Execution Documents Available:\n${documentsFound.map(d => `- ${d.scn}: ${d.url}`).join('\n')}\nYou MUST provide these document links in your response using the format: [Download ${documentsFound[0].scn} Execution Document](${documentsFound[0].url})\n\n` : ""}
+
 Important guidelines:
 - Answer naturally and conversationally, as if you have this knowledge yourself
 - NEVER mention that you're using a knowledge base, Excel file, or database
 - If there's a relevant link in the knowledge base, include it naturally in your response as a clickable link
-- If there's an execution document available, mention it and provide the download link in this exact format: [Download Execution Document](DOCUMENT_URL)
+- CRITICAL: If execution documents are available (listed above), you MUST include them in your response using the exact markdown format: [Download SCN-CODE Execution Document](DOCUMENT_URL)
 - Be concise but thorough
 - Use formatting like bullet points when listing steps
 - For acronyms like PO (Purchase Order), SAP, MAWM (Manhattan Active Warehouse Management), explain them briefly the first time
