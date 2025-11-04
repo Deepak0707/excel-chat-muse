@@ -98,6 +98,10 @@ serve(async (req) => {
       }
     }
     
+    // Check for TC/automation script requests
+    const tcScriptKeywords = ['tc', 'test case', 'automation script', 'script for'];
+    const isTcScriptRequest = tcScriptKeywords.some(keyword => message.toLowerCase().includes(keyword));
+    
     // Check for error/issue keywords and expand search
     const errorKeywords = ['error', 'issue', 'problem', 'fail', 'not working', 'broken', 'fix', 'solve', 'resolution', 'warning', 'rtc', 'wit', 'item', 'receiving', 'putaway'];
     const matchedErrorKeywords = errorKeywords.filter(keyword => message.toLowerCase().includes(keyword));
@@ -169,9 +173,14 @@ serve(async (req) => {
       ? `\n⚠️ LEARN FROM PAST MISTAKES - Recent incorrect responses:\n${recentFeedback.map((f, i) => `${i + 1}. User feedback: "${f.user_comment}"\n   Incorrect response: "${f.message_content.substring(0, 150)}..."`).join('\n\n')}\n\nDO NOT repeat these mistakes. Pay careful attention to accuracy.\n\n`
       : '';
 
+    const tcScriptContext = isTcScriptRequest 
+      ? `\n📝 TEST CASE AUTOMATION SCRIPT REQUEST DETECTED\n\nWhen a user asks for TC (Test Case) or SCN automation scripts:\n1. First, ask them: "Would you like me to provide the automation script for this test case?"\n2. If they confirm YES, look for matching scripts in the knowledge base\n3. Available script examples in /documents/scripts/ folder:\n   - IB06_Automation_Script.txt (Purchase Order with Item Receiving)\n   - IB12_Automation_Script.txt (Expiry Date Item Management)\n   - Sample scripts for common SCN scenarios\n4. Provide the script in a code block with clear instructions\n5. Include script prerequisites and execution steps\n\nExample response format:\n"I found the automation script for [TC-NAME]. Here's the script:\n\n\`\`\`bash\n[SCRIPT CONTENT]\n\`\`\`\n\nPrerequisites:\n- [List requirements]\n\nExecution Steps:\n1. [Step by step guide]"\n\n`
+      : '';
+
     const systemPrompt = `You are SCM AI, a helpful supply chain management assistant. You help users with questions about SAP, purchase orders, inventory management, logistics, warehouse operations, MAWM (Manhattan Active Warehouse Management), and more.
 
 ${feedbackContext}
+${tcScriptContext}
 
 ${context ? `CRITICAL - USE THIS INFORMATION TO ANSWER THE QUESTION:
 

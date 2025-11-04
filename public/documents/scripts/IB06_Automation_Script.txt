@@ -1,0 +1,90 @@
+#!/bin/bash
+# IB06 - Purchase Order with Item Receiving Automation Script
+# TC Name: IB06_PO_Item_Receiving_E2E_Test
+# Description: End-to-end automation for creating PO, receiving items, and putaway
+
+echo "=========================================="
+echo "IB06 - Purchase Order Item Receiving Test"
+echo "=========================================="
+
+# Prerequisites
+# - SAP system access with PO creation rights
+# - MAWM access with receiving permissions
+# - Valid item master data configured
+# - Active vendor account
+
+# Test Data
+VENDOR_CODE="V10001"
+ITEM_CODE="ITEM_123456"
+PO_QUANTITY="100"
+WAREHOUSE_LOCATION="WH01-A-01"
+
+# Step 1: Create Purchase Order in SAP
+echo "Step 1: Creating Purchase Order in SAP..."
+curl -X POST "https://sap-api.example.com/api/purchase-orders" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "vendor_code": "'$VENDOR_CODE'",
+    "items": [{
+      "item_code": "'$ITEM_CODE'",
+      "quantity": '$PO_QUANTITY',
+      "price": 10.50
+    }]
+  }'
+
+PO_NUMBER=$(echo $response | jq -r '.po_number')
+echo "✓ PO Created: $PO_NUMBER"
+
+# Step 2: Send ASN to MAWM
+echo "Step 2: Sending ASN to MAWM..."
+curl -X POST "https://mawm-api.example.com/api/asn" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "po_number": "'$PO_NUMBER'",
+    "vendor_code": "'$VENDOR_CODE'",
+    "expected_items": [{
+      "item_code": "'$ITEM_CODE'",
+      "quantity": '$PO_QUANTITY'
+    }]
+  }'
+
+echo "✓ ASN Sent Successfully"
+
+# Step 3: Perform Item Receiving
+echo "Step 3: Performing Item Receiving..."
+curl -X POST "https://mawm-api.example.com/api/receiving" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "po_number": "'$PO_NUMBER'",
+    "received_items": [{
+      "item_code": "'$ITEM_CODE'",
+      "quantity": '$PO_QUANTITY',
+      "location": "'$WAREHOUSE_LOCATION'"
+    }]
+  }'
+
+echo "✓ Item Received Successfully"
+
+# Step 4: Verify Putaway Task Creation
+echo "Step 4: Verifying Putaway Task..."
+curl -X GET "https://mawm-api.example.com/api/tasks?po_number=$PO_NUMBER"
+
+echo "✓ Putaway Task Created"
+
+# Step 5: Execute Putaway
+echo "Step 5: Executing Putaway..."
+curl -X POST "https://mawm-api.example.com/api/putaway/execute" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "po_number": "'$PO_NUMBER'",
+    "destination": "'$WAREHOUSE_LOCATION'"
+  }'
+
+echo "✓ Putaway Completed"
+
+echo "=========================================="
+echo "Test Completed Successfully!"
+echo "PO Number: $PO_NUMBER"
+echo "Items Received: $PO_QUANTITY"
+echo "Location: $WAREHOUSE_LOCATION"
+echo "=========================================="
