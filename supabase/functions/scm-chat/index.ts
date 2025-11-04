@@ -148,7 +148,7 @@ serve(async (req) => {
 
     // Define automation scripts map
     const SCRIPTS_MAP: Record<string, string> = {
-      IB01: `*** Settings ***
+      IB01_WIT: `*** Settings ***
 Documentation   WMS MA_Active IB01 - WIT - DC ASN
 Metadata    Automation_JIRA_TC    LTWMS-T5726
 Metadata    Developed_By    Madhumitha.Sahadevan@loblaw.ca
@@ -201,23 +201,17 @@ echo "================================================"`
     // Detect if user wants automation script based on conversation
     const scnMatchesAll = combinedText.match(scnPattern);
     const lastScnRaw = scnMatchesAll ? scnMatchesAll[scnMatchesAll.length - 1] : null;
-    const lastScnKey = lastScnRaw ? (lastScnRaw.toUpperCase().replace(/[-_]/g, '')) : null;
-    // Normalize SCN like IB01_WIT or IB01WIT to base code IB01
-    const normalizeScn = (key: string | null) => {
-      if (!key) return null;
-      const m = key.match(/^([A-Z]+[0-9]+)/);
-      return m ? m[1] : key;
-    };
-    const scnKey = normalizeScn(lastScnKey);
+    const scnCode = lastScnRaw ? lastScnRaw.toUpperCase().replace(/-/g, '_') : null;
     
     const yesRegex = /^(yes|y|yeah|yep|sure|ok|okay|please|give me|provide|show me)$/i;
     const explicitScriptRegex = /(automation\s+script|script|provide.*script|give.*script)/i;
-    const wantsScript = explicitScriptRegex.test(message) || yesRegex.test(message.trim());
+    const verbRequestRegex = /(provide|give|send|show|download|link|share)/i;
+    const wantsScript = explicitScriptRegex.test(message) || verbRequestRegex.test(message) || yesRegex.test(message.trim());
 
     console.log("Found knowledge entries:", knowledge?.length || 0);
-    console.log("Script request detected:", wantsScript, "Raw SCN:", lastScnKey, "Normalized SCN:", scnKey);
+    console.log("Script request detected:", wantsScript, "SCN:", scnCode);
     console.log("Available scripts:", Object.keys(SCRIPTS_MAP));
-    console.log("Script found in map:", scnKey && SCRIPTS_MAP[scnKey] ? "YES" : "NO");
+    console.log("Script found in map:", scnCode && SCRIPTS_MAP[scnCode] ? "YES" : "NO");
     
     const knowledgeMetadata = {
       count: knowledge.length,
@@ -253,13 +247,13 @@ echo "================================================"`
         .join("\n\n");
     }
 
-    if (wantsScript && scnKey && SCRIPTS_MAP[scnKey]) {
-      const scriptContent = SCRIPTS_MAP[scnKey];
-      const downloadPath = scnKey === 'IB01'
+    if (wantsScript && scnCode && SCRIPTS_MAP[scnCode]) {
+      const scriptContent = SCRIPTS_MAP[scnCode];
+      const downloadPath = scnCode === 'IB01_WIT'
         ? '/documents/scripts/IB01_WIT.robot'
-        : `/documents/scripts/${scnKey}_Automation_Script.txt`;
-      const codeBlockLang = scnKey === 'IB01' ? 'robotframework' : 'bash';
-      const reply = `Here is the automation script for ${scnKey}:\n\n\`\`\`${codeBlockLang}\n${scriptContent}\n\`\`\`\n\n[Download ${scnKey} Script](${downloadPath})`;
+        : `/documents/scripts/${scnCode}_Automation_Script.txt`;
+      const codeBlockLang = scnCode === 'IB01_WIT' ? 'robotframework' : 'bash';
+      const reply = `Here is the automation script for ${scnCode}:\n\n\`\`\`${codeBlockLang}\n${scriptContent}\n\`\`\`\n\n[Download ${scnCode} Script](${downloadPath})`;
 
       // Log assistant response immediately and return
       await supabase.from("conversations").insert({
@@ -268,7 +262,7 @@ echo "================================================"`
         message: reply,
         metadata: {
           served_script: true,
-          scn: lastScnKey,
+          scn: scnCode,
           timestamp: new Date().toISOString(),
         },
       });
