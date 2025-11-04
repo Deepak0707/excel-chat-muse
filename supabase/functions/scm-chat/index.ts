@@ -194,6 +194,44 @@ serve(async (req) => {
 
     // Inject automation scripts if user confirmed
     const SCRIPTS_MAP: Record<string, string> = {
+      IB01: `*** Settings ***
+Documentation   WMS MA_Active IB01 - WIT - DC ASN
+Metadata    Automation_JIRA_TC    LTWMS-T5726
+Metadata    Developed_By    Madhumitha.Sahadevan@loblaw.ca
+Metadata    Test_type   SIT - SAP/WMS/MIF
+Library     DateTime
+Resource   ../../../../../Keywords/Inbound/MAWM_Inbound_PreReceiving_Keywords.robot
+
+*** Variables ***
+\${InputFile}    \${CURDIR}\${/}../../../../../Datatables/MHE/MAWM_DATA_IB_WIT.xlsx
+\${Retry_IB01_WIT}   80x
+\${Retry_Interval_IB01_WIT}    30 seconds
+\${TC_No}    TC_IB01_WIT
+
+*** Test Cases ***
+IB01_WIT_Pre-Requisite
+    [Tags]   LTWMS-T5726
+    EXCEL_DATATABLES_INPUT_SETUP   \${InputFile}   \${SheetName}      \${TC_No}
+    IMPORT_FILES_FOR_IB
+    Wait Until Keyword Succeeds    \${Retry_API}    \${Retry_Interval_API}   API_Authentication_Token
+    
+IB01_WIT_TC01_SAP_PO_Creation
+    SAP LAUNCH   \${SAP.SysName}    \${SAP.Client}    \${SAP.Username}    \${SAP.Password}
+    ME21N_PO_Creation    \${ExcelFile}     \${TC_No}
+    ME23N_Check    \${ExcelFile}     \${TC_No}
+
+IB_06_TC06_WMS_Receiving
+    LOAD_JSON_TEMPLATE_AND_UPDATE_DATA_FROM_EXCEL
+    Wait Until Keyword Succeeds    \${Retry_IB01_WIT}      \${Retry_Interval_IB01_WIT}  API_PO_Validation
+    LOGIN_MAWM_ACTIVE
+    CREATE_ASN
+    GENERATE_AND_ASSIGN_ASN_TO_INBOUND_DELIVERY
+    ASSIGN_DOCK_DOOR_TO_INBOUND_DELIVERY
+    TASKGROUP_VEHICLETYPE_SELECTION
+    RECEIVE_LPN_INITIATE_TRANSACTION
+    Receive_DC_ASN_LPN_WITRON   IB01_WIT
+    RTC_WITRON_PUTAWAY
+    VERIFY_ASN    \${ASN_ID}`,
       IB06: `#!/bin/bash
 # IB06 - Purchase Order with Item Receiving Automation Script
 # TC Name: IB06_PO_Item_Receiving_E2E_Test
@@ -399,8 +437,10 @@ echo "================================================"`
 
     if (wantsScript && lastScnKey && SCRIPTS_MAP[lastScnKey]) {
       const scriptContent = SCRIPTS_MAP[lastScnKey];
-      const downloadPath = `/documents/scripts/${lastScnKey}_Automation_Script.txt`;
-      const reply = `Here is the automation script for ${lastScnKey}:\n\n\`\`\`bash\n${scriptContent}\n\`\`\`\n\n[Download ${lastScnKey} Automation Script](${downloadPath})`;
+      const fileExtension = lastScnKey === 'IB01' ? '.robot' : '.txt';
+      const downloadPath = `/documents/scripts/${lastScnKey}_${fileExtension === '.robot' ? 'WIT' : 'Automation_Script'}${fileExtension}`;
+      const codeBlockLang = lastScnKey === 'IB01' ? 'robotframework' : 'bash';
+      const reply = `Here is the automation script for ${lastScnKey}:\n\n\`\`\`${codeBlockLang}\n${scriptContent}\n\`\`\`\n\n[Download ${lastScnKey} Script](${downloadPath})`;
 
       // Log assistant response immediately and return
       await supabase.from("conversations").insert({
