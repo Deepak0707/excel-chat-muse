@@ -203,10 +203,12 @@ echo "================================================"`
     const lastScnRaw = scnMatchesAll ? scnMatchesAll[scnMatchesAll.length - 1] : null;
     const scnCode = lastScnRaw ? lastScnRaw.toUpperCase().replace(/-/g, '_') : null;
     
-    const yesRegex = /^(yes|y|yeah|yep|sure|ok|okay|please|give me|provide|show me)$/i;
-    const explicitScriptRegex = /(automation\s+script|script|provide.*script|give.*script)/i;
-    const verbRequestRegex = /(provide|give|send|show|download|link|share)/i;
-    const wantsScript = explicitScriptRegex.test(message) || verbRequestRegex.test(message) || yesRegex.test(message.trim());
+    // Only consider it a script request if explicitly asking for script OR confirming with yes
+    const yesRegex = /^(yes|y|yeah|yep|sure|ok|okay|go ahead|goahead)$/i;
+    const explicitScriptRegex = /(automation\s+script|script|provide.*script|give.*script|show.*script)/i;
+    const isConfirmation = yesRegex.test(message.trim());
+    const isExplicitScriptRequest = explicitScriptRegex.test(message);
+    const wantsScript = isConfirmation || isExplicitScriptRequest;
 
     console.log("Found knowledge entries:", knowledge?.length || 0);
     console.log("Script request detected:", wantsScript, "SCN:", scnCode);
@@ -247,7 +249,47 @@ echo "================================================"`
         .join("\n\n");
     }
 
-    if (wantsScript && scnCode && SCRIPTS_MAP[scnCode]) {
+    // Check if we have an SCN with available script
+    const hasScriptAvailable = scnCode && SCRIPTS_MAP[scnCode];
+    
+    // If SCN found but user hasn't confirmed yet, show TC details and ask
+    if (hasScriptAvailable && !wantsScript && knowledge && knowledge.length > 0) {
+      const matchingTc = knowledge.filter((k: any) => (
+        (k.scn_code || '').toUpperCase().replace(/-/g, '_') === scnCode
+      ));
+      const usedTc = matchingTc.length > 0 ? matchingTc : knowledge.slice(0, 2);
+      const tcDetails = usedTc.map((item: any) => {
+        let s = `**SCN:** ${item.scn_code || scnCode}\n**Q:** ${item.question}\n**A:** ${item.answer}`;
+        if (item.link) s += `\n**Link:** ${item.link}`;
+        if (item.document_url) s += `\n**Execution Document:** [Download](${item.document_url})`;
+        if (item.screenshots && item.screenshots.length > 0) {
+          s += `\n**Screenshots:**\n${item.screenshots.map((url: string) => `![Screenshot](${url})`).join('\n')}`;
+        }
+        return s;
+      }).join('\n\n---\n\n');
+
+      const reply = `${tcDetails}\n\n---\n\n**Automation Script Available**\n\nI have an automation script for **${scnCode}**. Would you like me to provide it?`;
+
+      await supabase.from("conversations").insert({
+        session_id,
+        role: "assistant",
+        message: reply,
+        metadata: {
+          tc_details_shown: true,
+          scn: scnCode,
+          awaiting_script_confirmation: true,
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      return new Response(
+        JSON.stringify({ reply, sessionId: session_id }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    // User confirmed - provide both TC details and script
+    if (wantsScript && hasScriptAvailable) {
       const scriptContent = SCRIPTS_MAP[scnCode];
 
       // Build TC details from knowledge base (prefer matching SCN)
@@ -256,19 +298,21 @@ echo "================================================"`
       ));
       const usedTc = matchingTc.length > 0 ? matchingTc : (knowledge || []).slice(0, 2);
       const tcDetails = usedTc.map((item: any) => {
-        let s = `SCN: ${item.scn_code || scnCode}\nQ: ${item.question}\nA: ${item.answer}`;
-        if (item.link) s += `\nLink: ${item.link}`;
-        if (item.document_url) s += `\nExecution Document: ${item.document_url}`;
-        if (item.screenshots && item.screenshots.length > 0) s += `\nScreenshots: ${item.screenshots.join(', ')}`;
+        let s = `**SCN:** ${item.scn_code || scnCode}\n**Q:** ${item.question}\n**A:** ${item.answer}`;
+        if (item.link) s += `\n**Link:** ${item.link}`;
+        if (item.document_url) s += `\n**Execution Document:** [Download](${item.document_url})`;
+        if (item.screenshots && item.screenshots.length > 0) {
+          s += `\n**Screenshots:**\n${item.screenshots.map((url: string) => `![Screenshot](${url})`).join('\n')}`;
+        }
         return s;
-      }).join('\n\n');
+      }).join('\n\n---\n\n');
 
       const downloadPath = scnCode === 'IB01_WIT'
         ? '/documents/scripts/IB01_WIT.robot'
         : `/documents/scripts/${scnCode}_Automation_Script.txt`;
       const codeBlockLang = scnCode === 'IB01_WIT' ? 'robotframework' : 'bash';
 
-      const reply = `Test Case Details - ${scnCode}\n\n${tcDetails}\n\nAutomation Script - ${scnCode}:\n\n\`\`\`${codeBlockLang}\n${scriptContent}\n\`\`\`\n\n[Download ${scnCode} Script](${downloadPath})`;
+      const reply = `${tcDetails}\n\n---\n\n**Automation Script - ${scnCode}:**\n\n\`\`\`${codeBlockLang}\n${scriptContent}\n\`\`\`\n\n[Download ${scnCode} Script](${downloadPath})`;
 
       // Log assistant response immediately and return
       await supabase.from("conversations").insert({
