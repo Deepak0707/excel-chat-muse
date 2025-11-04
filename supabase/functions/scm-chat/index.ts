@@ -53,14 +53,16 @@ serve(async (req) => {
         }))
       : [{ role: "user", content: message }];
 
-    // Search for relevant knowledge using flexible matching
-    const searchTerms = message.toLowerCase().split(' ').filter((term: string) => term.length > 2);
+    // Search for relevant knowledge using flexible matching (includes conversation history)
+    const historyText = (conversationHistory || []).map((m: any) => m.message).join(' ');
+    const combinedText = `${historyText} ${message}`;
+    const searchTerms = combinedText.toLowerCase().split(' ').filter((term: string) => term.length > 2);
     
     let knowledge: any[] = [];
     
     // Enhanced SCN code pattern matching (handles IB-02, IB02, IB02_WIT, ERROR-01, etc.)
     const scnPattern = /\b([A-Z]{2,5}[-_]?\d+(?:\.\d+)?(?:[-_][A-Z]+)?)\b/gi;
-    const scnMatches = message.match(scnPattern);
+    const scnMatches = combinedText.match(scnPattern);
     
     if (scnMatches) {
       for (const scn of scnMatches) {
