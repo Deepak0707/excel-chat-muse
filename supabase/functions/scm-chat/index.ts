@@ -125,6 +125,7 @@ serve(async (req) => {
     // Prepare context for AI from knowledge base
     let context = "";
     const documentsFound: Array<{scn: string, url: string}> = [];
+    const screenshotsFound: Array<{scn: string, urls: string[]}> = [];
     
     if (knowledge && knowledge.length > 0) {
       context = knowledge
@@ -139,6 +140,10 @@ serve(async (req) => {
           if (item.document_url) {
             documentsFound.push({ scn: item.scn_code, url: item.document_url });
             entry += `\nExecution Document Available: ${item.document_url}`;
+          }
+          if (item.screenshots && item.screenshots.length > 0) {
+            screenshotsFound.push({ scn: item.scn_code, urls: item.screenshots });
+            entry += `\nScreenshots Available: ${item.screenshots.join(', ')}`;
           }
           return entry;
         })
@@ -163,12 +168,15 @@ IMPORTANT: The information above is the CORRECT answer from your knowledge syste
 
 ${documentsFound.length > 0 ? `IMPORTANT - Execution Documents Available:\n${documentsFound.map(d => `- ${d.scn}: ${d.url}`).join('\n')}\nYou MUST provide these document links in your response using the format: [Download ${documentsFound[0].scn} Execution Document](${documentsFound[0].url})\n\n` : ""}
 
+${screenshotsFound.length > 0 ? `CRITICAL - Screenshots Available:\n${screenshotsFound.map(s => `- ${s.scn}: ${s.urls.join(', ')}`).join('\n')}\nYou MUST include these screenshots in your response using markdown image syntax: ![Screenshot Description](screenshot_url)\nShow the screenshots inline in your answer to help users visualize the steps.\n\n` : ""}
+
 Important guidelines:
 - When you have information from the knowledge system (shown above), you MUST use that exact information in your answer
 - Present the knowledge naturally and conversationally, as if you have this expertise yourself
 - NEVER mention "knowledge base", "Excel file", "database", or that you're looking up information
 - If there's a relevant link provided, include it naturally in your response as a clickable link
 - CRITICAL: If execution documents are available (listed above), you MUST include them in your response using the exact markdown format: [Download SCN-CODE Execution Document](DOCUMENT_URL)
+- CRITICAL: If screenshots are available (listed above), you MUST display them inline in your response using markdown: ![Description](screenshot_url). Show ALL available screenshots to help users visualize the issue and solution.
 - If no execution document is available for the requested SCN, clearly state: "I don't have an execution document available for this scenario."
 - If you don't have relevant information in your knowledge system, use your general expertise to help
 - Be concise but thorough

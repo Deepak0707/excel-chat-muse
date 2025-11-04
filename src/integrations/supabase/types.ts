@@ -51,6 +51,7 @@ export type Database = {
           link: string | null
           question: string
           scn_code: string | null
+          screenshots: string[] | null
           updated_at: string
         }
         Insert: {
@@ -62,6 +63,7 @@ export type Database = {
           link?: string | null
           question: string
           scn_code?: string | null
+          screenshots?: string[] | null
           updated_at?: string
         }
         Update: {
@@ -73,6 +75,7 @@ export type Database = {
           link?: string | null
           question?: string
           scn_code?: string | null
+          screenshots?: string[] | null
           updated_at?: string
         }
         Relationships: []
