@@ -150,6 +150,13 @@ serve(async (req) => {
     const scnMatchesAll = combinedText.match(scnPattern);
     const lastScnRaw = scnMatchesAll ? scnMatchesAll[scnMatchesAll.length - 1] : null;
     const lastScnKey = lastScnRaw ? (lastScnRaw.toUpperCase().replace(/[-_]/g, '')) : null;
+    // Normalize SCN like IB01_WIT or IB01WIT to base code IB01
+    const normalizeScn = (key: string | null) => {
+      if (!key) return null;
+      const m = key.match(/^([A-Z]+[0-9]+)/);
+      return m ? m[1] : key;
+    };
+    const scnKey = normalizeScn(lastScnKey);
     
     const yesRegex = /^(yes|y|yeah|yep|sure|ok|okay|please|give me|provide|show me)$/i;
     const explicitScriptRegex = /(automation\s+script|script|provide.*script|give.*script)/i;
@@ -435,12 +442,13 @@ echo "Test Completed Successfully!"
 echo "================================================"`
     };
 
-    if (wantsScript && lastScnKey && SCRIPTS_MAP[lastScnKey]) {
-      const scriptContent = SCRIPTS_MAP[lastScnKey];
-      const fileExtension = lastScnKey === 'IB01' ? '.robot' : '.txt';
-      const downloadPath = `/documents/scripts/${lastScnKey}_${fileExtension === '.robot' ? 'WIT' : 'Automation_Script'}${fileExtension}`;
-      const codeBlockLang = lastScnKey === 'IB01' ? 'robotframework' : 'bash';
-      const reply = `Here is the automation script for ${lastScnKey}:\n\n\`\`\`${codeBlockLang}\n${scriptContent}\n\`\`\`\n\n[Download ${lastScnKey} Script](${downloadPath})`;
+    if (wantsScript && scnKey && SCRIPTS_MAP[scnKey]) {
+      const scriptContent = SCRIPTS_MAP[scnKey];
+      const downloadPath = scnKey === 'IB01'
+        ? '/documents/scripts/IB01_WIT.robot'
+        : `/documents/scripts/${scnKey}_Automation_Script.txt`;
+      const codeBlockLang = scnKey === 'IB01' ? 'robotframework' : 'bash';
+      const reply = `Here is the automation script for ${scnKey}:\n\n\`\`\`${codeBlockLang}\n${scriptContent}\n\`\`\`\n\n[Download ${scnKey} Script](${downloadPath})`;
 
       // Log assistant response immediately and return
       await supabase.from("conversations").insert({
