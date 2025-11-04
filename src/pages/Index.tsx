@@ -29,6 +29,28 @@ const Index = () => {
     }
   }, [messages]);
 
+  const handleFeedback = async (messageContent: string, feedbackType: 'positive' | 'negative') => {
+    try {
+      const { error } = await supabase.from('message_feedback').insert({
+        session_id: sessionId,
+        message_role: 'assistant',
+        message_content: messageContent,
+        feedback_type: feedbackType,
+      });
+
+      if (error) {
+        console.error('Error submitting feedback:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to submit feedback. Please try again.",
+        });
+      }
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+    }
+  };
+
   const handleSend = async (message: string) => {
     const userMessage: Message = { role: "user", content: message };
     setMessages((prev) => [...prev, userMessage]);
@@ -90,7 +112,12 @@ const Index = () => {
       <ScrollArea className="flex-1 px-6">
         <div ref={scrollRef} className="max-w-4xl mx-auto py-6 space-y-4">
           {messages.map((msg, idx) => (
-            <ChatMessage key={idx} role={msg.role} content={msg.content} />
+            <ChatMessage 
+              key={idx} 
+              role={msg.role} 
+              content={msg.content}
+              onFeedback={msg.role === 'assistant' ? (type) => handleFeedback(msg.content, type) : undefined}
+            />
           ))}
           {isLoading && (
             <div className="flex gap-3 p-4 rounded-lg bg-[hsl(var(--chat-assistant-bg))] mr-12 animate-pulse">

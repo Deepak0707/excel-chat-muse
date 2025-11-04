@@ -1,12 +1,16 @@
 import { cn } from "@/lib/utils";
-import { Bot, User } from "lucide-react";
+import { Bot, User, ThumbsUp, ThumbsDown } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 interface ChatMessageProps {
   role: "user" | "assistant";
   content: string;
+  onFeedback?: (feedbackType: 'positive' | 'negative') => void;
 }
 
-export const ChatMessage = ({ role, content }: ChatMessageProps) => {
+export const ChatMessage = ({ role, content, onFeedback }: ChatMessageProps) => {
+  const [feedback, setFeedback] = useState<'positive' | 'negative' | null>(null);
   const isUser = role === "user";
 
   // Convert markdown-style links to HTML links and handle document downloads
@@ -59,6 +63,11 @@ export const ChatMessage = ({ role, content }: ChatMessageProps) => {
     return parts.length > 0 ? parts : text;
   };
 
+  const handleFeedback = (type: 'positive' | 'negative') => {
+    setFeedback(type);
+    onFeedback?.(type);
+  };
+
   return (
     <div
       className={cn(
@@ -71,8 +80,35 @@ export const ChatMessage = ({ role, content }: ChatMessageProps) => {
       <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-background/10">
         {isUser ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
       </div>
-      <div className="flex-1 whitespace-pre-wrap break-words">
-        {formatContent(content)}
+      <div className="flex-1">
+        <div className="whitespace-pre-wrap break-words">
+          {formatContent(content)}
+        </div>
+        {role === "assistant" && onFeedback && (
+          <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleFeedback('positive')}
+              className={`h-7 px-2 ${feedback === 'positive' ? 'text-green-600 hover:text-green-600' : 'text-muted-foreground'}`}
+            >
+              <ThumbsUp className="w-3.5 h-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleFeedback('negative')}
+              className={`h-7 px-2 ${feedback === 'negative' ? 'text-red-600 hover:text-red-600' : 'text-muted-foreground'}`}
+            >
+              <ThumbsDown className="w-3.5 h-3.5" />
+            </Button>
+            {feedback && (
+              <span className="text-xs text-muted-foreground self-center ml-2">
+                Thanks for your feedback!
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

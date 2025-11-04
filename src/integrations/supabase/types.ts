@@ -41,6 +41,36 @@ export type Database = {
         }
         Relationships: []
       }
+      message_feedback: {
+        Row: {
+          created_at: string | null
+          feedback_type: string
+          id: string
+          message_content: string
+          message_role: string
+          session_id: string
+          user_comment: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          feedback_type: string
+          id?: string
+          message_content: string
+          message_role: string
+          session_id: string
+          user_comment?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          feedback_type?: string
+          id?: string
+          message_content?: string
+          message_role?: string
+          session_id?: string
+          user_comment?: string | null
+        }
+        Relationships: []
+      }
       scm_knowledge: {
         Row: {
           answer: string
