@@ -249,11 +249,26 @@ echo "================================================"`
 
     if (wantsScript && scnCode && SCRIPTS_MAP[scnCode]) {
       const scriptContent = SCRIPTS_MAP[scnCode];
+
+      // Build TC details from knowledge base (prefer matching SCN)
+      const matchingTc = (knowledge || []).filter((k: any) => (
+        (k.scn_code || '').toUpperCase().replace(/-/g, '_') === scnCode
+      ));
+      const usedTc = matchingTc.length > 0 ? matchingTc : (knowledge || []).slice(0, 2);
+      const tcDetails = usedTc.map((item: any) => {
+        let s = `SCN: ${item.scn_code || scnCode}\nQ: ${item.question}\nA: ${item.answer}`;
+        if (item.link) s += `\nLink: ${item.link}`;
+        if (item.document_url) s += `\nExecution Document: ${item.document_url}`;
+        if (item.screenshots && item.screenshots.length > 0) s += `\nScreenshots: ${item.screenshots.join(', ')}`;
+        return s;
+      }).join('\n\n');
+
       const downloadPath = scnCode === 'IB01_WIT'
         ? '/documents/scripts/IB01_WIT.robot'
         : `/documents/scripts/${scnCode}_Automation_Script.txt`;
       const codeBlockLang = scnCode === 'IB01_WIT' ? 'robotframework' : 'bash';
-      const reply = `Here is the automation script for ${scnCode}:\n\n\`\`\`${codeBlockLang}\n${scriptContent}\n\`\`\`\n\n[Download ${scnCode} Script](${downloadPath})`;
+
+      const reply = `Test Case Details - ${scnCode}\n\n${tcDetails}\n\nAutomation Script - ${scnCode}:\n\n\`\`\`${codeBlockLang}\n${scriptContent}\n\`\`\`\n\n[Download ${scnCode} Script](${downloadPath})`;
 
       // Log assistant response immediately and return
       await supabase.from("conversations").insert({
@@ -262,6 +277,7 @@ echo "================================================"`
         message: reply,
         metadata: {
           served_script: true,
+          includes_tc: true,
           scn: scnCode,
           timestamp: new Date().toISOString(),
         },
