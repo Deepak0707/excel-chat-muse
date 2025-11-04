@@ -2,15 +2,20 @@ import { cn } from "@/lib/utils";
 import { Bot, User, ThumbsUp, ThumbsDown } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 interface ChatMessageProps {
   role: "user" | "assistant";
   content: string;
-  onFeedback?: (feedbackType: 'positive' | 'negative') => void;
+  onFeedback?: (feedbackType: 'positive' | 'negative', comment?: string) => void;
+  onRegenerate?: () => void;
 }
 
-export const ChatMessage = ({ role, content, onFeedback }: ChatMessageProps) => {
+export const ChatMessage = ({ role, content, onFeedback, onRegenerate }: ChatMessageProps) => {
   const [feedback, setFeedback] = useState<'positive' | 'negative' | null>(null);
+  const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
+  const [feedbackComment, setFeedbackComment] = useState("");
   const isUser = role === "user";
 
   // Convert markdown-style links to HTML links and handle document downloads
@@ -63,9 +68,20 @@ export const ChatMessage = ({ role, content, onFeedback }: ChatMessageProps) => 
     return parts.length > 0 ? parts : text;
   };
 
-  const handleFeedback = (type: 'positive' | 'negative') => {
-    setFeedback(type);
-    onFeedback?.(type);
+  const handlePositiveFeedback = () => {
+    setFeedback('positive');
+    onFeedback?.('positive');
+  };
+
+  const handleNegativeFeedback = () => {
+    setShowFeedbackDialog(true);
+  };
+
+  const submitNegativeFeedback = () => {
+    setFeedback('negative');
+    onFeedback?.('negative', feedbackComment);
+    setShowFeedbackDialog(false);
+    setFeedbackComment("");
   };
 
   return (
@@ -89,7 +105,7 @@ export const ChatMessage = ({ role, content, onFeedback }: ChatMessageProps) => 
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => handleFeedback('positive')}
+              onClick={handlePositiveFeedback}
               className={`h-7 px-2 ${feedback === 'positive' ? 'text-green-600 hover:text-green-600' : 'text-muted-foreground'}`}
             >
               <ThumbsUp className="w-3.5 h-3.5" />
@@ -97,11 +113,21 @@ export const ChatMessage = ({ role, content, onFeedback }: ChatMessageProps) => 
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => handleFeedback('negative')}
+              onClick={handleNegativeFeedback}
               className={`h-7 px-2 ${feedback === 'negative' ? 'text-red-600 hover:text-red-600' : 'text-muted-foreground'}`}
             >
               <ThumbsDown className="w-3.5 h-3.5" />
             </Button>
+            {feedback === 'negative' && onRegenerate && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onRegenerate}
+                className="h-7 text-xs ml-2"
+              >
+                Regenerate
+              </Button>
+            )}
             {feedback && (
               <span className="text-xs text-muted-foreground self-center ml-2">
                 Thanks for your feedback!
@@ -109,6 +135,31 @@ export const ChatMessage = ({ role, content, onFeedback }: ChatMessageProps) => 
             )}
           </div>
         )}
+        
+        <Dialog open={showFeedbackDialog} onOpenChange={setShowFeedbackDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Help us improve</DialogTitle>
+              <DialogDescription>
+                Please tell us what was wrong with this response so we can improve future answers.
+              </DialogDescription>
+            </DialogHeader>
+            <Textarea
+              placeholder="What was incorrect or missing in this response?"
+              value={feedbackComment}
+              onChange={(e) => setFeedbackComment(e.target.value)}
+              className="min-h-[100px]"
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowFeedbackDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={submitNegativeFeedback}>
+                Submit Feedback
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

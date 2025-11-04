@@ -21,6 +21,15 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
     
+    // Retrieve recent negative feedback to learn from
+    const { data: recentFeedback } = await supabase
+      .from('message_feedback')
+      .select('message_content, user_comment')
+      .eq('feedback_type', 'negative')
+      .not('user_comment', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(10);
+    
     // Log user message
     await supabase.from("conversations").insert({
       session_id,
@@ -156,7 +165,13 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
+    const feedbackContext = recentFeedback && recentFeedback.length > 0
+      ? `\n⚠️ LEARN FROM PAST MISTAKES - Recent incorrect responses:\n${recentFeedback.map((f, i) => `${i + 1}. User feedback: "${f.user_comment}"\n   Incorrect response: "${f.message_content.substring(0, 150)}..."`).join('\n\n')}\n\nDO NOT repeat these mistakes. Pay careful attention to accuracy.\n\n`
+      : '';
+
     const systemPrompt = `You are SCM AI, a helpful supply chain management assistant. You help users with questions about SAP, purchase orders, inventory management, logistics, warehouse operations, MAWM (Manhattan Active Warehouse Management), and more.
+
+${feedbackContext}
 
 ${context ? `CRITICAL - USE THIS INFORMATION TO ANSWER THE QUESTION:
 

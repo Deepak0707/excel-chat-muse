@@ -29,13 +29,18 @@ const Index = () => {
     }
   }, [messages]);
 
-  const handleFeedback = async (messageContent: string, feedbackType: 'positive' | 'negative') => {
+  const handleFeedback = async (
+    messageContent: string, 
+    feedbackType: 'positive' | 'negative',
+    comment?: string
+  ) => {
     try {
       const { error } = await supabase.from('message_feedback').insert({
         session_id: sessionId,
         message_role: 'assistant',
         message_content: messageContent,
         feedback_type: feedbackType,
+        user_comment: comment || null,
       });
 
       if (error) {
@@ -45,10 +50,33 @@ const Index = () => {
           title: "Error",
           description: "Failed to submit feedback. Please try again.",
         });
+      } else {
+        toast({
+          title: feedbackType === 'positive' ? "Thanks for your feedback!" : "Feedback recorded",
+          description: feedbackType === 'negative' 
+            ? "We'll use this to improve future responses."
+            : "Glad we could help!",
+        });
       }
     } catch (error) {
       console.error('Error submitting feedback:', error);
     }
+  };
+
+  const handleRegenerate = async (messageIndex: number) => {
+    const userMessage = messages[messageIndex - 1];
+    if (!userMessage || userMessage.role !== 'user') return;
+
+    toast({
+      title: "Regenerating response",
+      description: "Learning from your feedback...",
+    });
+
+    // Remove the incorrect assistant message
+    setMessages((prev) => prev.slice(0, messageIndex));
+    
+    // Resend the user's message
+    await handleSend(userMessage.content);
   };
 
   const handleSend = async (message: string) => {
@@ -116,7 +144,8 @@ const Index = () => {
               key={idx} 
               role={msg.role} 
               content={msg.content}
-              onFeedback={msg.role === 'assistant' ? (type) => handleFeedback(msg.content, type) : undefined}
+              onFeedback={msg.role === 'assistant' ? (type, comment) => handleFeedback(msg.content, type, comment) : undefined}
+              onRegenerate={msg.role === 'assistant' && idx === messages.length - 1 ? () => handleRegenerate(idx) : undefined}
             />
           ))}
           {isLoading && (
