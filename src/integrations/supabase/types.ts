@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      conversations: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          metadata: Json | null
+          role: string
+          session_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          metadata?: Json | null
+          role: string
+          session_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          metadata?: Json | null
+          role?: string
+          session_id?: string
+        }
+        Relationships: []
+      }
       scm_knowledge: {
         Row: {
           answer: string
@@ -55,7 +82,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_conversation_stats: {
+        Args: { days_back?: number }
+        Returns: {
+          avg_messages_per_session: number
+          total_conversations: number
+          total_messages: number
+          unique_sessions: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

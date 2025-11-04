@@ -19,6 +19,7 @@ const Index = () => {
     },
   ]);
   const [isLoading, setIsLoading] = useState(false);
+  const [sessionId] = useState(() => crypto.randomUUID());
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -35,7 +36,7 @@ const Index = () => {
 
     try {
       const { data, error } = await supabase.functions.invoke("scm-chat", {
-        body: { message },
+        body: { message, sessionId },
       });
 
       if (error) throw error;

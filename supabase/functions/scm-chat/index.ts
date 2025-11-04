@@ -13,12 +13,21 @@ serve(async (req) => {
   }
 
   try {
-    const { message } = await req.json();
-    console.log("Received message:", message);
+    const { message, sessionId } = await req.json();
+    const session_id = sessionId || crypto.randomUUID();
+    console.log("Received message:", message, "Session ID:", session_id);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    // Log user message
+    await supabase.from("conversations").insert({
+      session_id,
+      role: "user",
+      message,
+      metadata: { timestamp: new Date().toISOString() }
+    });
 
     // Search for relevant knowledge using flexible matching
     const searchTerms = message.toLowerCase().split(' ').filter((term: string) => term.length > 2);
@@ -106,6 +115,12 @@ serve(async (req) => {
     knowledge = Array.from(new Map(knowledge.map((item: any) => [item.id, item])).values());
 
     console.log("Found knowledge entries:", knowledge?.length || 0);
+    
+    const knowledgeMetadata = {
+      count: knowledge.length,
+      scn_codes: knowledge.map((k: any) => k.scn_code).filter(Boolean),
+      questions: knowledge.map((k: any) => k.question?.substring(0, 100)).filter(Boolean)
+    };
 
     // Prepare context for AI from knowledge base
     let context = "";
@@ -219,10 +234,24 @@ Error Solving Capabilities:
     const reply = aiData.choices[0].message.content;
 
     console.log("AI response generated successfully");
-
-    return new Response(JSON.stringify({ reply }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    
+    // Log assistant response
+    await supabase.from("conversations").insert({
+      session_id,
+      role: "assistant",
+      message: reply,
+      metadata: {
+        knowledge_used: knowledgeMetadata,
+        timestamp: new Date().toISOString()
+      }
     });
+
+    return new Response(
+      JSON.stringify({ reply, sessionId: session_id }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   } catch (error) {
     console.error("Error in scm-chat function:", error);
     return new Response(
