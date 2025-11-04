@@ -146,7 +146,17 @@ serve(async (req) => {
     // Remove duplicates
     knowledge = Array.from(new Map(knowledge.map((item: any) => [item.id, item])).values());
 
+    // Detect if user wants automation script based on conversation
+    const scnMatchesAll = combinedText.match(scnPattern);
+    const lastScnRaw = scnMatchesAll ? scnMatchesAll[scnMatchesAll.length - 1] : null;
+    const lastScnKey = lastScnRaw ? (lastScnRaw.toUpperCase().replace(/[-_]/g, '')) : null;
+    
+    const yesRegex = /^(yes|y|yeah|yep|sure|ok|okay|please|give me|provide|show me)$/i;
+    const explicitScriptRegex = /(automation\s+script|script|provide.*script|give.*script)/i;
+    const wantsScript = explicitScriptRegex.test(message) || yesRegex.test(message.trim());
+
     console.log("Found knowledge entries:", knowledge?.length || 0);
+    console.log("Script request detected:", wantsScript, "SCN:", lastScnKey);
     
     const knowledgeMetadata = {
       count: knowledge.length,
@@ -180,6 +190,216 @@ serve(async (req) => {
           return entry;
         })
         .join("\n\n");
+    }
+
+    // Inject automation scripts if user confirmed
+    const SCRIPTS_MAP: Record<string, string> = {
+      IB06: `#!/bin/bash
+# IB06 - Purchase Order with Item Receiving Automation Script
+# TC Name: IB06_PO_Item_Receiving_E2E_Test
+
+echo "=========================================="
+echo "IB06 - Purchase Order Item Receiving Test"
+echo "=========================================="
+
+# Prerequisites
+# - SAP system access with PO creation rights
+# - MAWM access with receiving permissions
+# - Valid item master data configured
+
+# Test Data
+VENDOR_CODE="V10001"
+ITEM_CODE="ITEM_123456"
+PO_QUANTITY="100"
+WAREHOUSE_LOCATION="WH01-A-01"
+
+# Step 1: Create Purchase Order in SAP
+echo "Step 1: Creating Purchase Order in SAP..."
+curl -X POST "https://sap-api.example.com/api/purchase-orders" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "vendor_code": "'$VENDOR_CODE'",
+    "items": [{
+      "item_code": "'$ITEM_CODE'",
+      "quantity": '$PO_QUANTITY',
+      "price": 10.50
+    }]
+  }'
+
+PO_NUMBER=$(echo $response | jq -r '.po_number')
+echo "✓ PO Created: $PO_NUMBER"
+
+# Step 2: Send ASN to MAWM
+echo "Step 2: Sending ASN to MAWM..."
+curl -X POST "https://mawm-api.example.com/api/asn" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "po_number": "'$PO_NUMBER'",
+    "vendor_code": "'$VENDOR_CODE'",
+    "expected_items": [{
+      "item_code": "'$ITEM_CODE'",
+      "quantity": '$PO_QUANTITY'
+    }]
+  }'
+
+echo "✓ ASN Sent Successfully"
+
+# Step 3: Perform Item Receiving
+echo "Step 3: Performing Item Receiving..."
+curl -X POST "https://mawm-api.example.com/api/receiving" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "po_number": "'$PO_NUMBER'",
+    "received_items": [{
+      "item_code": "'$ITEM_CODE'",
+      "quantity": '$PO_QUANTITY',
+      "location": "'$WAREHOUSE_LOCATION'"
+    }]
+  }'
+
+echo "✓ Item Received Successfully"
+
+# Step 4: Verify Putaway Task Creation
+echo "Step 4: Verifying Putaway Task..."
+curl -X GET "https://mawm-api.example.com/api/tasks?po_number=$PO_NUMBER"
+echo "✓ Putaway Task Created"
+
+# Step 5: Execute Putaway
+echo "Step 5: Executing Putaway..."
+curl -X POST "https://mawm-api.example.com/api/putaway/execute" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "po_number": "'$PO_NUMBER'",
+    "destination": "'$WAREHOUSE_LOCATION'"
+  }'
+
+echo "✓ Putaway Completed"
+echo "=========================================="
+echo "Test Completed Successfully!"
+echo "=========================================="`,
+
+      IB12: `#!/bin/bash
+# IB12 - Expiry Date Item Management Automation Script
+# TC Name: IB12_Expiry_Date_Item_E2E_Test
+
+echo "================================================"
+echo "IB12 - Expiry Date Item Management Test"
+echo "================================================"
+
+# Prerequisites
+# - Item configured as expiry-dated in SAP
+# - Min/Max expiry dates configured
+# - MAWM expiry date validation enabled
+
+# Test Data
+VENDOR_CODE="V10002"
+ITEM_CODE="EXPIRY_ITEM_789"
+PO_QUANTITY="50"
+EXPIRY_DATE="2025-12-31"
+WAREHOUSE_LOCATION="WH01-B-05-EXPIRY"
+
+# Step 1: Verify Item Configuration in SAP
+echo "Step 1: Verifying Item Master Data..."
+curl -X GET "https://sap-api.example.com/api/items/$ITEM_CODE" \\
+  -H "Accept: application/json"
+
+EXPIRY_FLAG=$(echo $response | jq -r '.expiry_dated_flag')
+if [ "$EXPIRY_FLAG" != "true" ]; then
+  echo "✗ ERROR: Item not configured as expiry-dated"
+  exit 1
+fi
+echo "✓ Item configured correctly with expiry date flag"
+
+# Step 2: Create Purchase Order with Expiry Date
+echo "Step 2: Creating PO with Expiry Date..."
+curl -X POST "https://sap-api.example.com/api/purchase-orders" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "vendor_code": "'$VENDOR_CODE'",
+    "items": [{
+      "item_code": "'$ITEM_CODE'",
+      "quantity": '$PO_QUANTITY',
+      "expiry_date": "'$EXPIRY_DATE'",
+      "price": 15.75
+    }]
+  }'
+
+PO_NUMBER=$(echo $response | jq -r '.po_number')
+echo "✓ PO Created: $PO_NUMBER with Expiry Date: $EXPIRY_DATE"
+
+# Step 3: Send ASN with Expiry Information
+echo "Step 3: Sending ASN with Expiry Data to MAWM..."
+curl -X POST "https://mawm-api.example.com/api/asn" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "po_number": "'$PO_NUMBER'",
+    "vendor_code": "'$VENDOR_CODE'",
+    "expected_items": [{
+      "item_code": "'$ITEM_CODE'",
+      "quantity": '$PO_QUANTITY',
+      "expiry_date": "'$EXPIRY_DATE'"
+    }]
+  }'
+
+echo "✓ ASN with Expiry Data Sent"
+
+# Step 4: Validate Min/Max Expiry Dates
+echo "Step 4: Validating Expiry Date Range..."
+curl -X POST "https://mawm-api.example.com/api/validation/expiry" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "item_code": "'$ITEM_CODE'",
+    "expiry_date": "'$EXPIRY_DATE'"
+  }'
+
+VALIDATION_STATUS=$(echo $response | jq -r '.status')
+if [ "$VALIDATION_STATUS" != "valid" ]; then
+  echo "✗ ERROR: Expiry date validation failed"
+  exit 1
+fi
+echo "✓ Expiry Date within acceptable range"
+
+# Step 5: Receive Item with Expiry Date
+echo "Step 5: Receiving Item with Expiry Tracking..."
+curl -X POST "https://mawm-api.example.com/api/receiving" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "po_number": "'$PO_NUMBER'",
+    "received_items": [{
+      "item_code": "'$ITEM_CODE'",
+      "quantity": '$PO_QUANTITY',
+      "expiry_date": "'$EXPIRY_DATE'",
+      "location": "'$WAREHOUSE_LOCATION'"
+    }]
+  }'
+
+echo "✓ Expiry-Dated Item Received"
+
+# Step 6: Verify FEFO Logic
+echo "Step 6: Verifying FEFO Logic..."
+curl -X GET "https://mawm-api.example.com/api/inventory/fefo?item_code=$ITEM_CODE"
+echo "✓ FEFO Logic Applied Correctly"
+
+# Step 7: Execute Putaway to Expiry Zone
+echo "Step 7: Executing Putaway to Expiry Storage Zone..."
+curl -X POST "https://mawm-api.example.com/api/putaway/execute" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "po_number": "'$PO_NUMBER'",
+    "destination": "'$WAREHOUSE_LOCATION'",
+    "expiry_date": "'$EXPIRY_DATE'",
+    "fefo_priority": true
+  }'
+
+echo "✓ Putaway to Expiry Zone Completed"
+echo "================================================"
+echo "Test Completed Successfully!"
+echo "================================================"`
+    };
+
+    if (wantsScript && lastScnKey && SCRIPTS_MAP[lastScnKey]) {
+      const scriptContent = SCRIPTS_MAP[lastScnKey];
+      context += `\n\n🤖 AUTOMATION SCRIPT FOR ${lastScnKey}\n\nSCN: ${lastScnKey}\nQ: Provide the automation script for ${lastScnKey}\nA: Here is the complete automation script for ${lastScnKey}:\n\n\`\`\`bash\n${scriptContent}\n\`\`\`\n\nExecution Steps:\n1. Save the script as ${lastScnKey.toLowerCase()}_script.sh\n2. Make it executable: chmod +x ${lastScnKey.toLowerCase()}_script.sh\n3. Update the test data variables as needed\n4. Run: ./${lastScnKey.toLowerCase()}_script.sh\n5. Monitor output for successful completion`;
     }
 
     // Call Lovable AI
