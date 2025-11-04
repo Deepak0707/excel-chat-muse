@@ -191,7 +191,10 @@ serve(async (req) => {
       : '';
 
     const tcScriptContext = isTcScriptRequest 
-      ? `\n🚨 CRITICAL - TEST CASE AUTOMATION SCRIPT REQUEST DETECTED 🚨\n\n⚠️ MANDATORY FIRST STEP - You MUST ask this question BEFORE providing any TC/SCN information:\n\n"I can help you with [TC/SCN NAME]. Would you like me to provide the automation script for this test case?"\n\nDO NOT provide the full answer yet. WAIT for the user to respond YES or NO.\n\nIf user says YES:\n- Check for matching scripts in /documents/scripts/ folder:\n  * IB06_Automation_Script.txt (Purchase Order with Item Receiving)\n  * IB12_Automation_Script.txt (Expiry Date Item Management)\n- Provide the script content in a code block\n- Include prerequisites and execution steps\n- Format: [Download IB06 Automation Script](/documents/scripts/IB06_Automation_Script.txt)\n\nIf user says NO:\n- Proceed with the regular knowledge base answer\n\nExample response:\n"I can help you with IB06. Would you like me to provide the automation script for this test case?"\n\n`
+      ? `\n🚨 CRITICAL - TEST CASE AUTOMATION SCRIPT REQUEST DETECTED 🚨\n\n⚠️ MANDATORY FIRST STEP - You MUST ask this question BEFORE providing any TC/SCN information:\n\n"I can help you with [TC/SCN NAME]. Would you like me to provide the automation script for this test case?"\n\nDO NOT provide the full answer yet. WAIT for the user to respond YES or NO.\n\nIf user says YES:\n- The automation scripts are stored in the knowledge base with SCN codes (IB06, IB12, etc.)
+- Search the knowledge base for entries with keywords "automation" and "script"
+- Provide the script content in a bash code block
+- Include prerequisites and execution steps from the knowledge base entry\n\nIf user says NO:\n- Proceed with the regular knowledge base answer\n\nExample response:\n"I can help you with IB06. Would you like me to provide the automation script for this test case?"\n\n`
       : '';
 
     const systemPrompt = `You are SCM AI, a helpful supply chain management assistant. You help users with questions about SAP, purchase orders, inventory management, logistics, warehouse operations, MAWM (Manhattan Active Warehouse Management), and more.
