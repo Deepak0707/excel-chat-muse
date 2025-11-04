@@ -399,7 +399,25 @@ echo "================================================"`
 
     if (wantsScript && lastScnKey && SCRIPTS_MAP[lastScnKey]) {
       const scriptContent = SCRIPTS_MAP[lastScnKey];
-      context += `\n\n🤖 AUTOMATION SCRIPT FOR ${lastScnKey}\n\nSCN: ${lastScnKey}\nQ: Provide the automation script for ${lastScnKey}\nA: Here is the complete automation script for ${lastScnKey}:\n\n\`\`\`bash\n${scriptContent}\n\`\`\`\n\nExecution Steps:\n1. Save the script as ${lastScnKey.toLowerCase()}_script.sh\n2. Make it executable: chmod +x ${lastScnKey.toLowerCase()}_script.sh\n3. Update the test data variables as needed\n4. Run: ./${lastScnKey.toLowerCase()}_script.sh\n5. Monitor output for successful completion`;
+      const downloadPath = `/documents/scripts/${lastScnKey}_Automation_Script.txt`;
+      const reply = `Here is the automation script for ${lastScnKey}:\n\n\`\`\`bash\n${scriptContent}\n\`\`\`\n\n[Download ${lastScnKey} Automation Script](${downloadPath})`;
+
+      // Log assistant response immediately and return
+      await supabase.from("conversations").insert({
+        session_id,
+        role: "assistant",
+        message: reply,
+        metadata: {
+          served_script: true,
+          scn: lastScnKey,
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      return new Response(
+        JSON.stringify({ reply, sessionId: session_id }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Call Lovable AI
