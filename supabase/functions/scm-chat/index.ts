@@ -38,6 +38,21 @@ serve(async (req) => {
       metadata: { timestamp: new Date().toISOString() }
     });
 
+    // Retrieve conversation history for context
+    const { data: conversationHistory } = await supabase
+      .from("conversations")
+      .select("role, message")
+      .eq("session_id", session_id)
+      .order("created_at", { ascending: true });
+
+    // Build conversation messages for AI (include history)
+    const conversationMessages = conversationHistory && conversationHistory.length > 0
+      ? conversationHistory.map((msg: any) => ({
+          role: msg.role,
+          content: msg.message
+        }))
+      : [{ role: "user", content: message }];
+
     // Search for relevant knowledge using flexible matching
     const searchTerms = message.toLowerCase().split(' ').filter((term: string) => term.length > 2);
     
@@ -100,7 +115,9 @@ serve(async (req) => {
     
     // Check for TC/automation script requests
     const tcScriptKeywords = ['tc', 'test case', 'automation script', 'script for'];
-    const isTcScriptRequest = tcScriptKeywords.some(keyword => message.toLowerCase().includes(keyword));
+    // Also check for SCN code patterns like IB06, IB-06, IB12, etc.
+    const scnCodePattern = /\b(IB|ERROR|SCN)[-_]?\d+\b/i;
+    const isTcScriptRequest = tcScriptKeywords.some(keyword => message.toLowerCase().includes(keyword)) || scnCodePattern.test(message);
     
     // Check for error/issue keywords and expand search
     const errorKeywords = ['error', 'issue', 'problem', 'fail', 'not working', 'broken', 'fix', 'solve', 'resolution', 'warning', 'rtc', 'wit', 'item', 'receiving', 'putaway'];
@@ -236,7 +253,7 @@ Error Solving Capabilities:
         model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: message },
+          ...conversationMessages,
         ],
         stream: false,
       }),
