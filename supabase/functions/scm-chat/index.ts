@@ -62,10 +62,10 @@ serve(async (req) => {
     
     // Enhanced SCN code pattern matching (handles IB-02, IB02, IB02_WIT, IB02-WIT, IB01-SSI, ERROR-01, etc.)
     const scnPattern = /\b([A-Z]{2,5}[-_]?\d+(?:\.\d+)?(?:[-_][A-Z]+)?)\b/gi;
-    const scnMatches = combinedText.match(scnPattern);
+    const scnMatchesCurrent = message.match(scnPattern);
     
-    if (scnMatches) {
-      for (const scn of scnMatches) {
+    if (scnMatchesCurrent) {
+      for (const scn of scnMatchesCurrent) {
         // Normalize the SCN code - convert underscores to hyphens
         const normalizedScn = scn.replace(/_/g, '-').toUpperCase();
         
@@ -98,7 +98,7 @@ serve(async (req) => {
     const issueKeywords = ['error', 'issue', 'problem', 'fail', 'not working', 'broken', 'fix', 'solve', 'resolution', 'warning', 'consolidat', 'consilidat', 'ocl', 'new item', 'quantity'];
     const hasIssueKeyword = issueKeywords.some(keyword => message.toLowerCase().includes(keyword));
     
-    if (hasIssueKeyword && knowledge.length === 0) {
+    if (hasIssueKeyword) {
       const issueSearchQueries = issueKeywords
         .filter(keyword => message.toLowerCase().includes(keyword))
         .flatMap(keyword => [
@@ -284,7 +284,7 @@ echo "================================================"`
     };
 
     // Detect if user wants automation script based on conversation
-    const scnMatchesCurrent = message.match(scnPattern);
+    // Use current-message SCN matches computed above
     const lastScnRaw = scnMatchesCurrent ? scnMatchesCurrent[scnMatchesCurrent.length - 1] : null;
     const scnCode = lastScnRaw ? lastScnRaw.toUpperCase().replace(/-/g, '_') : null;
     
