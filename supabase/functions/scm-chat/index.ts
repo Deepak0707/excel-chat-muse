@@ -168,7 +168,28 @@ serve(async (req) => {
     // Remove duplicates
     knowledge = Array.from(new Map(knowledge.map((item: any) => [item.id, item])).values());
 
-    // Define automation scripts map
+    // Rank knowledge by relevance to the CURRENT message and de-prioritize generic scenario entries
+    const tokens = Array.from(new Set(message.toLowerCase().split(/[^a-z0-9]+/).filter((t: string) => t.length > 2)));
+    const strongPhrases = ['new item','ocl','consolidat','consolidation','quantity','qty','not assigned','wm mobile','receiving','putaway'];
+    const relevanceScore = (item: any): number => {
+      let s = 0;
+      const q = (item.question || '').toLowerCase();
+      const a = (item.answer || '').toLowerCase();
+      for (const t of tokens) { if (q.includes(t)) s += 2; if (a.includes(t)) s += 2; }
+      for (const p of strongPhrases) {
+        if (message.toLowerCase().includes(p)) {
+          if (q.includes(p)) s += 6;
+          if (a.includes(p)) s += 6;
+        }
+      }
+      if ((item.scn_code || '').toUpperCase().startsWith('ISSUE-')) s += 5;
+      if (/^in the given scenario/i.test(item.answer || '') || /pre-?receiving[\s\S]*putaway/i.test(item.answer || '')) s -= 8; // generic template penalty
+      return s;
+    };
+    const rankedKnowledge = [...knowledge].sort((x: any, y: any) => relevanceScore(y) - relevanceScore(x));
+    const issuesRanked = rankedKnowledge.filter((k: any) => (k.scn_code || '').toUpperCase().startsWith('ISSUE-'));
+    console.log('Knowledge ranking top 3:', (rankedKnowledge || []).slice(0,3).map((k: any) => ({ scn: k.scn_code, score: relevanceScore(k) })));
+
     const SCRIPTS_MAP: Record<string, string> = {
       IB01_WIT: `*** Settings ***
 Documentation   WMS MA_Active IB01 - WIT - DC ASN
@@ -462,11 +483,26 @@ echo "================================================"`
     // If we found relevant knowledge and user didn't explicitly ask about an SCN or a script,
     // answer deterministically from the knowledge base (no AI) and enrich with related issue assets.
     if (!userMentionedScn && knowledge && knowledge.length > 0 && !wantsScript && !hasScriptAvailable) {
-      // Prefer ISSUE entries if present to avoid mixing with SCN TCs
-      const issuesOnly = knowledge.filter((k: any) => (k.scn_code || '').toUpperCase().startsWith('ISSUE-'));
-      const used = issuesOnly.length > 0 ? issuesOnly : knowledge.slice(0, 2);
-      let reply = used.map((item: any) => {
-        let s = `${item.answer}`;
+      // Prefer ISSUE entries and pick the single best-matching entry by our ranking
+      const genericPattern = /^in the given scenario/i;
+      const pick = (issuesRanked.length > 0 ? issuesRanked : rankedKnowledge).slice(0, 1);
+      let reply = pick.map((item: any) => {
+        const buildTailoredMessage = (msg: string) => {
+          if (/(consolidat|consolidation|ocl)/i.test(msg)) {
+            return "OCL not assigned: Create/verify a Consolidation Location, map it in putaway rules/task groups, and ensure the item/facility is eligible for consolidation. Reattempt receiving after updating.";
+          }
+          if (/(new\s*item|item\s*facilit)/i.test(msg)) {
+            return "New item error in WM Mobile: Enable the New Item flag and create the Item Facility record for the DC. Confirm sync to SSI, then retry receiving.";
+          }
+          if (/(quantity|qty)/i.test(msg)) {
+            return "Quantity error during receiving: Validate PO/ASN quantities, tolerances and unit conversions. Check profiling (pack/sub-pack) and update as needed, then retry.";
+          }
+          return "Here’s the focused guidance for your issue based on your message. Use the related resources below for exact screens.";
+        };
+        let s = `${item.answer || ''}`;
+        if (genericPattern.test(s)) {
+          s = buildTailoredMessage(message);
+        }
         if (item.link) s += `\n\n**Link:** ${item.link}`;
         if (item.document_url) s += `\n\n**Execution Document:** [Download](${item.document_url})`;
         if (item.screenshots && item.screenshots.length > 0) {
