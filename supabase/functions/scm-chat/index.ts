@@ -60,20 +60,25 @@ serve(async (req) => {
     
     let knowledge: any[] = [];
     
-    // Enhanced SCN code pattern matching (handles IB-02, IB02, IB02_WIT, ERROR-01, etc.)
+    // Enhanced SCN code pattern matching (handles IB-02, IB02, IB02_WIT, IB02-WIT, IB01-SSI, ERROR-01, etc.)
     const scnPattern = /\b([A-Z]{2,5}[-_]?\d+(?:\.\d+)?(?:[-_][A-Z]+)?)\b/gi;
     const scnMatches = combinedText.match(scnPattern);
     
     if (scnMatches) {
       for (const scn of scnMatches) {
-        // Extract core code (e.g., "IB02" from "IB02_WIT" or "IB-02")
+        // Normalize the SCN code - convert underscores to hyphens
+        const normalizedScn = scn.replace(/_/g, '-').toUpperCase();
+        
+        // Extract core code (e.g., "IB02" from "IB02-WIT" or "IB-02")
         const coreCode = scn.split(/[-_]/)[0] + (scn.match(/\d+/) || [''])[0];
         
-        // Search variations: original, with hyphen, without hyphen, core code
+        // Search variations: exact match, normalized, with/without hyphen, core code
         const searchVariations = [
+          `scn_code.ilike.%${normalizedScn}%`,
           `scn_code.ilike.%${scn}%`,
           `scn_code.ilike.%${coreCode}%`,
           `scn_code.ilike.%${coreCode.replace(/([A-Z]+)(\d+)/, '$1-$2')}%`,
+          `question.ilike.%${normalizedScn}%`,
           `question.ilike.%${scn}%`,
           `question.ilike.%${coreCode}%`
         ];
