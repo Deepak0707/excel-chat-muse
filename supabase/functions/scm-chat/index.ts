@@ -95,7 +95,7 @@ serve(async (req) => {
     }
     
     // PRIORITY: Search for ISSUE entries first for error/problem keywords
-    const issueKeywords = ['error', 'issue', 'problem', 'fail', 'not working', 'broken', 'fix', 'solve', 'resolution', 'warning', 'consolidat', 'ocl', 'new item', 'quantity'];
+    const issueKeywords = ['error', 'issue', 'problem', 'fail', 'not working', 'broken', 'fix', 'solve', 'resolution', 'warning', 'consolidat', 'consilidat', 'ocl', 'new item', 'quantity'];
     const hasIssueKeyword = issueKeywords.some(keyword => message.toLowerCase().includes(keyword));
     
     if (hasIssueKeyword && knowledge.length === 0) {
@@ -114,7 +114,7 @@ serve(async (req) => {
         .limit(5);
       
       if (issueData && issueData.length > 0) {
-        knowledge = [...knowledge, ...issueData];
+        knowledge = issueData;
       }
     }
     
@@ -462,8 +462,9 @@ echo "================================================"`
     // If we found relevant knowledge and user didn't explicitly ask about an SCN or a script,
     // answer deterministically from the knowledge base (no AI) and enrich with related issue assets.
     if (!userMentionedScn && knowledge && knowledge.length > 0 && !wantsScript && !hasScriptAvailable) {
-      // Simple relevance: use first result(s) from searches above
-      const used = knowledge.slice(0, 2);
+      // Prefer ISSUE entries if present to avoid mixing with SCN TCs
+      const issuesOnly = knowledge.filter((k: any) => (k.scn_code || '').toUpperCase().startsWith('ISSUE-'));
+      const used = issuesOnly.length > 0 ? issuesOnly : knowledge.slice(0, 2);
       let reply = used.map((item: any) => {
         let s = `${item.answer}`;
         if (item.link) s += `\n\n**Link:** ${item.link}`;
