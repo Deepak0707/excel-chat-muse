@@ -186,6 +186,69 @@ IB_06_TC06_WMS_Receiving
     Receive_DC_ASN_LPN_WITRON   IB01_WIT
     RTC_WITRON_PUTAWAY
     VERIFY_ASN    \${ASN_ID}`,
+      IB02_WIT: `*** Settings ***
+Documentation   WMS MA_Active IB02 - WIT - Vendor ASN
+Metadata    Automation_JIRA_TC    LTWMS-T5726
+Metadata    Developed_By    Madhumitha.Sahadevan@loblaw.ca
+Metadata    Test_type   SIT - SAP/WMS/MIF
+Library     DateTime
+Resource   ../../../../../Keywords/Inbound/MAWM_Inbound_PreReceiving_Keywords.robot
+
+*** Variables ***
+\${InputFile}    \${CURDIR}\${/}../../../../../Datatables/MHE/MAWM_DATA_IB_WIT.xlsx
+\${SheetName}     IB02_WIT_Input
+\${Retry_IB02_WIT}   80x
+\${Retry_Interval_IB02_WIT}    30 seconds
+\${TC_No}    TC_IB02_WIT
+
+*** Test Cases ***
+IB02_WIT_Pre-Requisite
+    [Tags]   LTWMS-T5726
+    EXCEL_DATATABLES_INPUT_SETUP   \${InputFile}   \${SheetName}      \${TC_No}
+    IMPORT_FILES_FOR_IB
+    Wait Until Keyword Succeeds    \${Retry_API}    \${Retry_Interval_API}   API_Authentication_Token
+
+IB02_WIT_TC01_Inbound_Happy_Path_WMS_Receiving
+    LOAD_JSON_TEMPLATE_AND_UPDATE_DATA_FROM_EXCEL
+    Wait Until Keyword Succeeds    \${Retry_IB02_WIT}      \${Retry_Interval_IB02_WIT}  API_PO_Validation
+    LOGIN_MAWM_ACTIVE
+    GENERATE_AND_ASSIGN_ASN_TO_INBOUND_DELIVERY
+    ASSIGN_DOCK_DOOR_TO_INBOUND_DELIVERY
+    RECEIVE_LPN_INITIATE_TRANSACTION
+    RECEIVE_VENDOR_ASN_LPN_WITRON   IB02_WIT
+    RTC_WITRON_PUTAWAY
+    VERIFY_ASN    \${ASN_ID}`,
+      IB03_WIT: `*** Settings ***
+Documentation   WMS MA_Active IB03 - WIT - Vendor ASN
+Metadata    Automation_JIRA_TC    LTWMS-T5726
+Metadata    Developed_By    Madhumitha.Sahadevan@loblaw.ca
+Metadata    Test_type   SIT - SAP/WMS/MIF
+Library     DateTime
+Resource   ../../../../../Keywords/Inbound/MAWM_Inbound_PreReceiving_Keywords.robot
+
+*** Variables ***
+\${InputFile}    \${CURDIR}\${/}../../../../../Datatables/MHE/MAWM_DATA_IB_WIT.xlsx
+\${SheetName}     IB03_WIT_Input
+\${Retry_IB03_WIT}   30x
+\${Retry_Interval_IB03_WIT}   30 seconds
+\${TC_No}    TC_IB03_WIT
+
+*** Test Cases ***
+IB03_WIT_Pre-Requisite
+    [Tags]   LTWMS-T5726
+    EXCEL_DATATABLES_INPUT_SETUP   \${InputFile}   \${SheetName}      \${TC_No}
+    IMPORT_FILES_FOR_IB
+    Wait Until Keyword Succeeds    \${Retry_API}    \${Retry_Interval_API}   API_Authentication_Token
+
+IB_03_TC01_Inbound_WIT_WM_Receive_Induct_Putaway
+    LOAD_JSON_TEMPLATE_AND_UPDATE_DATA_FROM_EXCEL
+    LOGIN_MAWM_ACTIVE
+    CREATE_ASN
+    GENERATE_AND_ASSIGN_ASN_TO_INBOUND_DELIVERY
+    ASSIGN_DOCK_DOOR_TO_INBOUND_DELIVERY
+    Receive_DC_ASN_LPN_WITRON  IB03_WIT
+    RTC_WITRON_PUTAWAY
+    VERIFY_ASN    \${ASN_ID}`,
       IB06: `#!/bin/bash
 # IB06 - Purchase Order with Item Receiving Automation Script
 echo "=========================================="
@@ -307,10 +370,11 @@ echo "================================================"`
         return s;
       }).join('\n\n---\n\n');
 
-      const downloadPath = scnCode === 'IB01_WIT'
-        ? '/documents/scripts/IB01_WIT.robot'
+      const robotScripts = ['IB01_WIT', 'IB02_WIT', 'IB03_WIT'];
+      const downloadPath = robotScripts.includes(scnCode)
+        ? `/documents/scripts/${scnCode}.robot`
         : `/documents/scripts/${scnCode}_Automation_Script.txt`;
-      const codeBlockLang = scnCode === 'IB01_WIT' ? 'robotframework' : 'bash';
+      const codeBlockLang = robotScripts.includes(scnCode) ? 'robotframework' : 'bash';
 
       const reply = `${tcDetails}\n\n---\n\n**Automation Script - ${scnCode}:**\n\n\`\`\`${codeBlockLang}\n${scriptContent}\n\`\`\`\n\n[Download ${scnCode} Script](${downloadPath})`;
 
