@@ -322,11 +322,11 @@ echo "================================================"`
       ));
       const usedTc = matchingTc.length > 0 ? matchingTc : knowledge.slice(0, 2);
       const tcDetails = usedTc.map((item: any) => {
-        let s = `**SCN:** ${item.scn_code || scnCode}\n**Q:** ${item.question}\n**A:** ${item.answer}`;
-        if (item.link) s += `\n**Link:** ${item.link}`;
-        if (item.document_url) s += `\n**Execution Document:** [Download](${item.document_url})`;
+        let s = `${item.answer}`;
+        if (item.link) s += `\n\n**Link:** ${item.link}`;
+        if (item.document_url) s += `\n\n**Execution Document:** [Download](${item.document_url})`;
         if (item.screenshots && item.screenshots.length > 0) {
-          s += `\n**Screenshots:**\n${item.screenshots.map((url: string) => `![Screenshot](${url})`).join('\n')}`;
+          s += `\n\n**Screenshots:**\n${item.screenshots.map((url: string) => `![Screenshot](${url})`).join('\n')}`;
         }
         return s;
       }).join('\n\n---\n\n');
@@ -361,11 +361,11 @@ echo "================================================"`
       ));
       const usedTc = matchingTc.length > 0 ? matchingTc : (knowledge || []).slice(0, 2);
       const tcDetails = usedTc.map((item: any) => {
-        let s = `**SCN:** ${item.scn_code || scnCode}\n**Q:** ${item.question}\n**A:** ${item.answer}`;
-        if (item.link) s += `\n**Link:** ${item.link}`;
-        if (item.document_url) s += `\n**Execution Document:** [Download](${item.document_url})`;
+        let s = `${item.answer}`;
+        if (item.link) s += `\n\n**Link:** ${item.link}`;
+        if (item.document_url) s += `\n\n**Execution Document:** [Download](${item.document_url})`;
         if (item.screenshots && item.screenshots.length > 0) {
-          s += `\n**Screenshots:**\n${item.screenshots.map((url: string) => `![Screenshot](${url})`).join('\n')}`;
+          s += `\n\n**Screenshots:**\n${item.screenshots.map((url: string) => `![Screenshot](${url})`).join('\n')}`;
         }
         return s;
       }).join('\n\n---\n\n');
