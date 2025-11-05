@@ -442,6 +442,59 @@ echo "================================================"`
       );
     }
 
+    // If we found relevant knowledge and user didn't explicitly ask about an SCN or a script,
+    // answer deterministically from the knowledge base (no AI) and enrich with related issue assets.
+    if (!userMentionedScn && knowledge && knowledge.length > 0 && !wantsScript && !hasScriptAvailable) {
+      // Simple relevance: use first result(s) from searches above
+      const used = knowledge.slice(0, 2);
+      let reply = used.map((item: any) => {
+        let s = `${item.answer}`;
+        if (item.link) s += `\n\n**Link:** ${item.link}`;
+        if (item.document_url) s += `\n\n**Execution Document:** [Download](${item.document_url})`;
+        if (item.screenshots && item.screenshots.length > 0) {
+          s += `\n\n**Screenshots:**\n${item.screenshots.map((url: string) => `![Screenshot](${url})`).join('\n')}`;
+        }
+        return s;
+      }).join('\n\n---\n\n');
+
+      // Attach related assets from the public/issues folder for common issues
+      const lowerMsg = message.toLowerCase();
+      const issuesDoc = '/documents/issues/Issues_faced_During_Execution.docx';
+      const issueAssets: Array<{match: RegExp; screenshots: string[]}> = [
+        { match: /(consolidat|consolidation|ocl)/i, screenshots: [
+          '/documents/issues/screenshots/issue-02-consolidation-locations.png',
+          '/documents/issues/screenshots/issue-02-ocl-error.png'
+        ]},
+        { match: /(new\s*item|item\s*facilit|new-item)/i, screenshots: [
+          '/documents/issues/screenshots/issue-01-new-item-error.png',
+          '/documents/issues/screenshots/issue-01-item-facilities.png'
+        ]},
+        { match: /(quantity|qty)/i, screenshots: [
+          '/documents/issues/screenshots/issue-03-quantity-error.png',
+          '/documents/issues/screenshots/issue-03-item-facilities.jpg'
+        ]},
+      ];
+      const matched = issueAssets.find(a => a.match.test(lowerMsg));
+      if (matched) {
+        reply += `\n\n---\n\n**Related resources:**\n[Download Issues Document](${issuesDoc})\n\n${matched.screenshots.map((u) => `![Screenshot](${u})`).join('\n')}`;
+      }
+
+      await supabase.from('conversations').insert({
+        session_id,
+        role: 'assistant',
+        message: reply,
+        metadata: {
+          knowledge_only: true,
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      return new Response(
+        JSON.stringify({ reply, sessionId: session_id }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Call Lovable AI
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
