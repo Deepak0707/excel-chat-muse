@@ -94,26 +94,43 @@ serve(async (req) => {
       }
     }
     
-    // Build flexible search queries for better matching
-    const searchQueries: string[] = [];
+    // PRIORITY: Search for ISSUE entries first for error/problem keywords
+    const issueKeywords = ['error', 'issue', 'problem', 'fail', 'not working', 'broken', 'fix', 'solve', 'resolution', 'warning', 'consolidat', 'ocl', 'new item', 'quantity'];
+    const hasIssueKeyword = issueKeywords.some(keyword => message.toLowerCase().includes(keyword));
     
-    // Search each term individually across all text fields
-    for (const term of searchTerms) {
-      searchQueries.push(`question.ilike.%${term}%`);
-      searchQueries.push(`answer.ilike.%${term}%`);
-      searchQueries.push(`scn_code.ilike.%${term}%`);
+    if (hasIssueKeyword && knowledge.length === 0) {
+      const issueSearchQueries = issueKeywords
+        .filter(keyword => message.toLowerCase().includes(keyword))
+        .flatMap(keyword => [
+          `scn_code.ilike.ISSUE-%`,
+          `question.ilike.%${keyword}%`,
+          `answer.ilike.%${keyword}%`
+        ]);
+      
+      const { data: issueData } = await supabase
+        .from('scm_knowledge')
+        .select('*')
+        .or(issueSearchQueries.join(','))
+        .limit(5);
+      
+      if (issueData && issueData.length > 0) {
+        knowledge = [...knowledge, ...issueData];
+      }
     }
     
-    // Also search for the full message
-    searchQueries.push(`question.ilike.%${message}%`);
-    searchQueries.push(`answer.ilike.%${message}%`);
-    
-    // Execute flexible search if no SCN matches
-    if (knowledge.length === 0 && searchQueries.length > 0) {
+    // Build flexible search queries for better matching (only if no SCN or ISSUE found)
+    if (knowledge.length === 0) {
+      const searchQueries: string[] = [];
+      
+      // Search for the full message first
+      searchQueries.push(`question.ilike.%${message}%`);
+      searchQueries.push(`answer.ilike.%${message}%`);
+      
       const { data: flexibleMatches } = await supabase
         .from("scm_knowledge")
         .select("*")
-        .or(searchQueries.join(','));
+        .or(searchQueries.join(','))
+        .limit(10);
       
       if (flexibleMatches && flexibleMatches.length > 0) {
         knowledge = [...knowledge, ...flexibleMatches];
