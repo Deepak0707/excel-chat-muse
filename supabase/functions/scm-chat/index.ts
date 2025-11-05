@@ -402,6 +402,39 @@ echo "================================================"`
       );
     }
 
+    // If we have knowledge but no script available, return TC details only
+    if (knowledge && knowledge.length > 0 && !hasScriptAvailable) {
+      const usedTc = knowledge.slice(0, 2);
+      const tcDetails = usedTc.map((item: any) => {
+        let s = `${item.answer}`;
+        if (item.link) s += `\n\n**Link:** ${item.link}`;
+        if (item.document_url) s += `\n\n**Execution Document:** [Download](${item.document_url})`;
+        if (item.screenshots && item.screenshots.length > 0) {
+          s += `\n\n**Screenshots:**\n${item.screenshots.map((url: string) => `![Screenshot](${url})`).join('\n')}`;
+        }
+        return s;
+      }).join('\n\n---\n\n');
+
+      const reply = `${tcDetails}`;
+
+      await supabase.from("conversations").insert({
+        session_id,
+        role: "assistant",
+        message: reply,
+        metadata: {
+          tc_details_shown: true,
+          scn: scnCode,
+          awaiting_script_confirmation: false,
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      return new Response(
+        JSON.stringify({ reply, sessionId: session_id }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Call Lovable AI
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
