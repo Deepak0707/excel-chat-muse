@@ -267,8 +267,8 @@ echo "================================================"`
     };
 
     // Detect if user wants automation script based on conversation
-    const scnMatchesAll = combinedText.match(scnPattern);
-    const lastScnRaw = scnMatchesAll ? scnMatchesAll[scnMatchesAll.length - 1] : null;
+    const scnMatchesCurrent = message.match(scnPattern);
+    const lastScnRaw = scnMatchesCurrent ? scnMatchesCurrent[scnMatchesCurrent.length - 1] : null;
     const scnCode = lastScnRaw ? lastScnRaw.toUpperCase().replace(/-/g, '_') : null;
     
     // Only consider it a script request if explicitly asking for script OR confirming with yes
@@ -404,7 +404,7 @@ echo "================================================"`
 
     // Only show direct TC details if user explicitly asked for an SCN code and we don't have a script
     // Otherwise let AI answer naturally using the knowledge context
-    const userMentionedScn = scnCode && scnMatches && scnMatches.length > 0;
+    const userMentionedScn = scnCode && scnMatchesCurrent && scnMatchesCurrent.length > 0;
     
     if (userMentionedScn && knowledge && knowledge.length > 0 && !hasScriptAvailable) {
       const matchingTc = knowledge.filter((k: any) => (
