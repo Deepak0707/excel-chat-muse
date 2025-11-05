@@ -402,9 +402,16 @@ echo "================================================"`
       );
     }
 
-    // If we have knowledge but no script available, return TC details only
-    if (knowledge && knowledge.length > 0 && !hasScriptAvailable) {
-      const usedTc = knowledge.slice(0, 2);
+    // Only show direct TC details if user explicitly asked for an SCN code and we don't have a script
+    // Otherwise let AI answer naturally using the knowledge context
+    const userMentionedScn = scnCode && scnMatches && scnMatches.length > 0;
+    
+    if (userMentionedScn && knowledge && knowledge.length > 0 && !hasScriptAvailable) {
+      const matchingTc = knowledge.filter((k: any) => (
+        (k.scn_code || '').toUpperCase().replace(/-/g, '_') === scnCode ||
+        (k.scn_code || '').toUpperCase().replace(/_/g, '-') === scnCode.replace(/_/g, '-')
+      ));
+      const usedTc = matchingTc.length > 0 ? matchingTc.slice(0, 2) : knowledge.slice(0, 2);
       const tcDetails = usedTc.map((item: any) => {
         let s = `${item.answer}`;
         if (item.link) s += `\n\n**Link:** ${item.link}`;
